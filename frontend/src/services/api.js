@@ -1,21 +1,38 @@
+import { createDemoMeasurements } from "./demo";
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+const IS_LOCAL = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
 export async function fetchMeasurements(filters) {
+  if (!API_BASE && !IS_LOCAL) {
+    return createDemoMeasurements(filters);
+  }
+
   const params = new URLSearchParams({
     country: filters.country,
     city: filters.city,
     parameter: filters.parameter,
     days: String(filters.days),
   });
-  const response = await fetch(`${API_BASE}/api/measurements?${params.toString()}`);
-  if (!response.ok) {
-    const detail = await response.json().catch(() => ({}));
-    throw new Error(detail.detail || "Não foi possível buscar os dados.");
+  try {
+    const response = await fetch(`${API_BASE}/api/measurements?${params.toString()}`);
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      throw new Error(detail.detail || "Não foi possível buscar os dados.");
+    }
+    return response.json();
+  } catch (error) {
+    if (!IS_LOCAL) {
+      return createDemoMeasurements(filters);
+    }
+    throw error;
   }
-  return response.json();
 }
 
 export async function fetchOptions() {
+  if (!API_BASE && !IS_LOCAL) {
+    throw new Error("Backend público não configurado.");
+  }
   const response = await fetch(`${API_BASE}/api/options`);
   if (!response.ok) {
     throw new Error("Não foi possível buscar as opções de filtros.");

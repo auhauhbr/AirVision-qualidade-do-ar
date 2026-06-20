@@ -12,41 +12,12 @@ O frontend segue o HTML de referência do projeto: sidebar com filtros, cards de
 
 ## Como rodar localmente
 
-### 1. Backend
+### Forma mais simples
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-copy .env.example .env
-uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
-```
+Na raiz do projeto:
 
-A OpenAQ atualmente usa autenticação via header `X-API-Key`. Crie uma chave gratuita em `https://explore.openaq.org/register` e coloque em `.env`:
-
-```env
-OPENAQ_API_KEY=sua-chave
-```
-
-Sem chave, ou se a API recusar a chamada, o backend mantém a tela viva com um conjunto demonstrativo e mostra um aviso no topo.
-
-### 2. Frontend
-
-Em outro terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Abra `http://127.0.0.1:5173`.
-
-### Opção em uma porta só
-
-Depois de instalar o frontend, você também pode gerar o build e deixar o FastAPI servir a interface:
-
-```bash
+```powershell
+.\.venv\Scripts\Activate.ps1
 cd frontend
 npm run build
 cd ..
@@ -54,6 +25,79 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Abra `http://127.0.0.1:8000`.
+
+O FastAPI servirá tanto a API quanto o frontend compilado. Quando alterar o frontend, execute `npm run build` novamente.
+
+### Desenvolvimento com atualização automática
+
+Terminal 1, na raiz:
+
+```bash
+.venv\Scripts\activate
+uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Terminal 2:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Abra `http://127.0.0.1:5173`.
+
+### Primeira instalação
+
+Se o ambiente ainda não estiver instalado:
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+cd frontend
+npm install
+cd ..
+```
+
+A OpenAQ usa autenticação via header `X-API-Key`. Crie uma chave gratuita e coloque em `.env`:
+
+```env
+OPENAQ_API_KEY=sua-chave
+```
+
+O `.env` não é enviado ao GitHub.
+
+## GitHub Pages
+
+O workflow `.github/workflows/publicar-pages.yml` publica o frontend automaticamente sempre que a branch `main` recebe um push.
+
+1. Envie o novo commit para o GitHub.
+2. Abra o repositório no GitHub.
+3. Entre em **Settings > Pages**.
+4. Em **Build and deployment > Source**, selecione **GitHub Actions**.
+5. Abra a aba **Actions** e acompanhe o workflow **Publicar no GitHub Pages**.
+
+O endereço será:
+
+```text
+https://auhauhbr.github.io/AirVision-qualidade-do-ar/
+```
+
+O GitHub Pages não executa Python/FastAPI. Por isso, sem um backend público configurado, o site publicado usa dados demonstrativos e deixa isso informado na interface.
+
+Para conectar um backend publicado posteriormente:
+
+1. Abra **Settings > Secrets and variables > Actions > Variables**.
+2. Crie a variável `VITE_API_BASE_URL`.
+3. Use como valor a URL pública do backend, sem barra no final.
+
+Exemplo:
+
+```text
+https://api-airvision.exemplo.com
+```
+
+Nunca coloque `OPENAQ_API_KEY` nas variáveis `VITE_*`: qualquer variável Vite fica visível no navegador.
 
 ## API local
 
