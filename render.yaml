@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: airvision-api
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: OPENAQ_API_KEY
+        sync: false
+      - key: AIRVISION_DB_PATH
+        value: /tmp/airvision.db
+      - key: AIRVISION_CACHE_TTL_MINUTES
+        value: "360"
+      - key: CORS_ORIGINS
+        value: https://auhauhbr.github.io

@@ -99,6 +99,54 @@ https://api-airvision.exemplo.com
 
 Nunca coloque `OPENAQ_API_KEY` nas variáveis `VITE_*`: qualquer variável Vite fica visível no navegador.
 
+## Backend público no Render
+
+O arquivo `render.yaml` configura um Web Service FastAPI gratuito no Render.
+
+### 1. Enviar a configuração
+
+```bash
+git add render.yaml .env.example backend/app/config.py backend/app/main.py
+git commit -m "Prepara backend para deploy no Render"
+git push origin main
+```
+
+### 2. Criar o serviço
+
+1. Entre em `https://dashboard.render.com`.
+2. Faça login com o GitHub.
+3. Clique em **New > Blueprint**.
+4. Selecione o repositório `AirVision-qualidade-do-ar`.
+5. Confirme o arquivo `render.yaml`.
+6. No campo solicitado para `OPENAQ_API_KEY`, informe a chave OpenAQ.
+7. Crie o Blueprint e aguarde o deploy ficar **Live**.
+
+O backend receberá uma URL semelhante a:
+
+```text
+https://airvision-api.onrender.com
+```
+
+Teste:
+
+```text
+https://airvision-api.onrender.com/api/health
+```
+
+### 3. Conectar o GitHub Pages
+
+1. Abra o repositório no GitHub.
+2. Entre em **Settings > Secrets and variables > Actions**.
+3. Abra a aba **Variables**.
+4. Crie uma variável de repositório chamada `VITE_API_BASE_URL`.
+5. Use a URL pública do Render, sem barra no final.
+6. Abra **Actions > Publicar no GitHub Pages**.
+7. Clique em **Run workflow** para publicar novamente.
+
+Depois disso, o GitHub Pages consultará o backend Render, que consulta a OpenAQ usando a chave protegida.
+
+Serviços gratuitos do Render podem entrar em repouso quando ficam sem acesso. A primeira requisição após um período inativo pode demorar mais.
+
 ## API local
 
 Endpoint principal:
