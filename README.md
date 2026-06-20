@@ -1,195 +1,262 @@
 # AirVision
 
-Dashboard de qualidade do ar com frontend React e backend FastAPI, usando dados da OpenAQ v3.
+Dashboard web para consulta e análise histórica da qualidade do ar, com dados reais da [OpenAQ v3](https://docs.openaq.org/).
 
-O frontend segue o HTML de referência do projeto: sidebar com filtros, cards de resumo, série temporal com hover/overlays, heatmap hora x dia da semana, tabela de dias críticos e exportação CSV.
+[Acessar o AirVision](https://auhauhbr.github.io/AirVision-qualidade-do-ar/) · [Verificar a API](https://airvision-api.onrender.com/api/health)
 
-## Stack
+![Visão geral do dashboard AirVision](docs/images/dashboard-visao-geral.png)
 
-- Frontend: React, Vite, Plotly
-- Backend: FastAPI, pandas, SQLite cache
-- Dados: OpenAQ v3
+## Sobre o projeto
 
-## Como rodar localmente
+O AirVision transforma medições de estações ambientais em indicadores e visualizações interativas. O usuário escolhe país, cidade, poluente e período; o frontend consulta a API FastAPI, que busca os sensores disponíveis na OpenAQ, processa os registros e devolve os dados prontos para os gráficos.
 
-### Forma mais simples
+### Funcionalidades
 
-Na raiz do projeto:
+- Filtros por país, cidade, poluente e período.
+- Suporte a PM2.5, PM10, NO₂, O₃, CO e SO₂.
+- Série temporal interativa com tooltip, limite recomendado pela OMS e zoom.
+- Médias móveis de 7 e 14 dias.
+- Identificação de anomalias e dias críticos.
+- Cards de média, pior dia, conformidade OMS e tendência anual.
+- Lista das estações utilizadas na agregação.
+- Heatmap de hora por dia da semana.
+- Exportação dos dados filtrados em CSV.
+- Cache local em SQLite para reduzir chamadas repetidas à OpenAQ.
+- Modo demonstrativo quando uma cidade não possui cobertura recente.
+
+## Visualizações
+
+### Média móvel e tooltip
+
+![Série temporal com média móvel de sete dias](docs/images/grafico-media-movel.png)
+
+### Detecção de anomalias
+
+![Modo de detecção de anomalias](docs/images/grafico-anomalias.png)
+
+## Arquitetura
+
+```mermaid
+flowchart LR
+    U[Usuário] --> P[GitHub Pages]
+    P -->|HTTPS| A[API FastAPI no Render]
+    A -->|X-API-Key| O[OpenAQ v3]
+    A <--> C[(Cache SQLite)]
+    A --> P
+```
+
+- **Frontend:** React, Vite e Plotly.
+- **Backend:** FastAPI, pandas e NumPy.
+- **Dados:** OpenAQ v3.
+- **Cache:** SQLite.
+- **Frontend em produção:** GitHub Pages.
+- **Backend em produção:** Render.
+- **CI/CD:** GitHub Actions.
+
+O segredo `OPENAQ_API_KEY` existe somente no backend. Ele nunca é incluído no bundle React nem enviado ao GitHub Pages.
+
+## Estrutura
+
+```text
+Air vision/
+├── .github/
+│   └── workflows/
+│       └── publicar-pages.yml
+├── backend/
+│   ├── app/
+│   │   ├── analytics.py
+│   │   ├── cache.py
+│   │   ├── cities.py
+│   │   ├── config.py
+│   │   ├── main.py
+│   │   ├── models.py
+│   │   └── openaq.py
+│   └── tests/
+├── docs/
+│   └── images/
+├── frontend/
+│   ├── src/
+│   │   ├── services/
+│   │   ├── main.jsx
+│   │   └── styles.css
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+├── .env.example
+├── .python-version
+├── render.yaml
+└── requirements.txt
+```
+
+## Executar localmente
+
+### Requisitos
+
+- Python 3.13
+- Node.js 22 ou superior
+- Uma chave da OpenAQ
+
+### 1. Preparar o backend
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+No arquivo `.env`, preencha:
+
+```env
+OPENAQ_API_KEY=sua_chave_openaq
+AIRVISION_DB_PATH=backend/airvision.db
+AIRVISION_CACHE_TTL_MINUTES=360
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000
+```
+
+O `.env` está no `.gitignore` e não deve ser versionado.
+
+### 2. Instalar o frontend
+
+```powershell
+cd frontend
+npm install
+cd ..
+```
+
+### 3. Desenvolvimento
+
+Backend:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
+uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Frontend, em outro terminal:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Acesse `http://127.0.0.1:5173`.
+
+### Executar em uma porta
+
+```powershell
 cd frontend
 npm run build
 cd ..
 uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Abra `http://127.0.0.1:8000`.
+Acesse `http://127.0.0.1:8000`. Caso a porta esteja ocupada, use outra, como `8001`.
 
-O FastAPI servirá tanto a API quanto o frontend compilado. Quando alterar o frontend, execute `npm run build` novamente.
+## API
 
-### Desenvolvimento com atualização automática
+### Saúde
 
-Terminal 1, na raiz:
-
-```bash
-.venv\Scripts\activate
-uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+```http
+GET /api/health
 ```
 
-Terminal 2:
+### Opções dos filtros
 
-```bash
+```http
+GET /api/options
+```
+
+### Medições processadas
+
+```http
+GET /api/measurements?city=Rio%20de%20Janeiro&country=BR&parameter=pm25&days=30
+```
+
+Parâmetros:
+
+| Campo | Exemplo | Descrição |
+|---|---|---|
+| `city` | `Rio de Janeiro` | Cidade cadastrada no AirVision |
+| `country` | `BR` | Código ISO do país |
+| `parameter` | `pm25` | Poluente consultado |
+| `days` | `30` | Período entre 7 e 365 dias |
+
+Quando `source` é `openaq`, a consulta veio da OpenAQ. Quando é `cache`, são dados reais anteriormente armazenados. Quando é `demo`, não havia cobertura recente para a combinação escolhida ou a API estava indisponível.
+
+## Testes
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pytest backend/tests -q -p no:cacheprovider
+```
+
+Build do frontend:
+
+```powershell
 cd frontend
-npm run dev
+npm run build
 ```
 
-Abra `http://127.0.0.1:5173`.
+## Deploy
 
-### Primeira instalação
+### Backend no Render
 
-Se o ambiente ainda não estiver instalado:
+O arquivo `render.yaml` define:
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-cd frontend
-npm install
-cd ..
-```
+- Python 3.13.
+- Instalação por `requirements.txt`.
+- Inicialização do Uvicorn.
+- Health check em `/api/health`.
+- Cache SQLite temporário em `/tmp/airvision.db`.
+- CORS para `https://auhauhbr.github.io`.
 
-A OpenAQ usa autenticação via header `X-API-Key`. Crie uma chave gratuita e coloque em `.env`:
-
-```env
-OPENAQ_API_KEY=sua-chave
-```
-
-O `.env` não é enviado ao GitHub.
-
-## GitHub Pages
-
-O workflow `.github/workflows/publicar-pages.yml` publica o frontend automaticamente sempre que a branch `main` recebe um push.
-
-1. Envie o novo commit para o GitHub.
-2. Abra o repositório no GitHub.
-3. Entre em **Settings > Pages**.
-4. Em **Build and deployment > Source**, selecione **GitHub Actions**.
-5. Abra a aba **Actions** e acompanhe o workflow **Publicar no GitHub Pages**.
-
-O endereço será:
+No Render, configure o segredo:
 
 ```text
-https://auhauhbr.github.io/AirVision-qualidade-do-ar/
+OPENAQ_API_KEY
 ```
 
-O GitHub Pages não executa Python/FastAPI. Por isso, sem um backend público configurado, o site publicado usa dados demonstrativos e deixa isso informado na interface.
-
-Para conectar um backend publicado posteriormente:
-
-1. Abra **Settings > Secrets and variables > Actions > Variables**.
-2. Crie a variável `VITE_API_BASE_URL`.
-3. Use como valor a URL pública do backend, sem barra no final.
-
-Exemplo:
-
-```text
-https://api-airvision.exemplo.com
-```
-
-Nunca coloque `OPENAQ_API_KEY` nas variáveis `VITE_*`: qualquer variável Vite fica visível no navegador.
-
-## Backend público no Render
-
-O arquivo `render.yaml` configura um Web Service FastAPI gratuito no Render.
-
-### 1. Enviar a configuração
-
-```bash
-git add render.yaml .env.example backend/app/config.py backend/app/main.py
-git commit -m "Prepara backend para deploy no Render"
-git push origin main
-```
-
-### 2. Criar o serviço
-
-1. Entre em `https://dashboard.render.com`.
-2. Faça login com o GitHub.
-3. Clique em **New > Blueprint**.
-4. Selecione o repositório `AirVision-qualidade-do-ar`.
-5. Confirme o arquivo `render.yaml`.
-6. No campo solicitado para `OPENAQ_API_KEY`, informe a chave OpenAQ.
-7. Crie o Blueprint e aguarde o deploy ficar **Live**.
-
-O backend receberá uma URL semelhante a:
+Backend atual:
 
 ```text
 https://airvision-api.onrender.com
 ```
 
-Teste:
+Instâncias gratuitas podem entrar em repouso. A primeira requisição após um período sem acessos pode demorar cerca de 50 segundos.
+
+### Frontend no GitHub Pages
+
+O workflow `.github/workflows/publicar-pages.yml` executa automaticamente em cada push para `main`.
+
+No repositório GitHub:
+
+1. Acesse **Settings > Pages**.
+2. Escolha **GitHub Actions** como fonte.
+3. Em **Settings > Secrets and variables > Actions > Variables**, configure:
 
 ```text
-https://airvision-api.onrender.com/api/health
+VITE_API_BASE_URL=https://airvision-api.onrender.com
 ```
 
-### 3. Conectar o GitHub Pages
+Site atual:
 
-1. Abra o repositório no GitHub.
-2. Entre em **Settings > Secrets and variables > Actions**.
-3. Abra a aba **Variables**.
-4. Crie uma variável de repositório chamada `VITE_API_BASE_URL`.
-5. Use a URL pública do Render, sem barra no final.
-6. Abra **Actions > Publicar no GitHub Pages**.
-7. Clique em **Run workflow** para publicar novamente.
-
-Depois disso, o GitHub Pages consultará o backend Render, que consulta a OpenAQ usando a chave protegida.
-
-Serviços gratuitos do Render podem entrar em repouso quando ficam sem acesso. A primeira requisição após um período inativo pode demorar mais.
-
-## API local
-
-Endpoint principal:
-
-```http
-GET /api/measurements?city=Recife&country=BR&parameter=pm25&days=30
+```text
+https://auhauhbr.github.io/AirVision-qualidade-do-ar/
 ```
 
-O frontend usa exatamente esse padrão. O backend resolve cidade para coordenadas, busca estações próximas na OpenAQ, coleta dados diários por sensor, agrega com pandas, calcula médias móveis, tendência, anomalias, conformidade OMS e devolve JSON pronto para os gráficos.
+Não coloque a chave OpenAQ em nenhuma variável `VITE_*`, pois essas variáveis ficam visíveis no navegador.
 
-Outros endpoints:
+## Cobertura dos dados
 
-```http
-GET /api/health
-GET /api/options
-```
+A presença de uma cidade na lista não garante que todos os poluentes possuam sensores ou medições recentes. A cobertura depende das estações publicadas na OpenAQ.
 
-## Parâmetros suportados
-
-- `pm25`
-- `pm10`
-- `no2`
-- `o3`
-- `co`
-- `so2`
-
-## Preparar para o GitHub
-
-Quando quiser subir para o repositório vazio:
-
-```bash
-git init
-git add .
-git commit -m "Initial AirVision dashboard"
-git branch -M main
-git remote add origin https://github.com/auhauhbr/AirVision-qualidade-do-ar.git
-git push -u origin main
-```
-
-Não suba o arquivo `.env`. Ele já está protegido pelo `.gitignore`.
+Por exemplo, uma cidade pode ter PM2.5 disponível, mas não possuir dados recentes para CO ou SO₂. Nesses casos, o AirVision informa que está usando o modo demonstrativo em vez de apresentar os valores simulados como dados reais.
 
 ## Referências
 
-- OpenAQ API docs: https://docs.openaq.org/
-- OpenAQ API key: https://docs.openaq.org/using-the-api/api-key
-- OpenAQ rate limits: https://docs.openaq.org/using-the-api/rate-limits
+- [OpenAQ API](https://docs.openaq.org/)
+- [OpenAQ API Key](https://docs.openaq.org/using-the-api/api-key)
+- [Render: deploy de FastAPI](https://render.com/docs/deploy-fastapi)
+- [GitHub Pages](https://docs.github.com/pages)
+- [Plotly JavaScript](https://plotly.com/javascript/)
